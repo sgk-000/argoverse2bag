@@ -1,26 +1,26 @@
-import sys
-import os
-from scipy.spatial.transform import Rotation as R
-import os
-import cv2
-import rospy
-import rosbag
-import progressbar
-from tf2_msgs.msg import TFMessage
-from datetime import datetime
-from std_msgs.msg import Header
-from sensor_msgs.msg import CameraInfo, Imu, PointField, NavSatFix
-import sensor_msgs.point_cloud2 as pcl2
-from geometry_msgs.msg import TransformStamped, TwistStamped, Transform
-from cv_bridge import CvBridge
-import numpy as np
 import argparse
+import os
+import sys
+from datetime import datetime
 from pathlib import Path
 
-from av2.datasets.sensor.av2_sensor_dataloader import AV2SensorDataLoader
-import av2.utils.io as av2_io
 import av2.geometry.geometry as geometry_utils
 import av2.utils.dense_grid_interpolation as dense_grid_interpolation
+import av2.utils.io as av2_io
+import cv2
+import numpy as np
+import progressbar
+import rosbag
+import rospy
+import sensor_msgs.point_cloud2 as pcl2
+from av2.datasets.sensor.av2_sensor_dataloader import AV2SensorDataLoader
+from av2.structures.sweep import Sweep
+from cv_bridge import CvBridge
+from geometry_msgs.msg import Transform, TransformStamped, TwistStamped
+from scipy.spatial.transform import Rotation as R
+from sensor_msgs.msg import CameraInfo, Imu, NavSatFix, PointField
+from std_msgs.msg import Header
+from tf2_msgs.msg import TFMessage
 
 
 def save_dynamic_tf(bag, av2_dataloader, lidar_fpaths, log_id):
@@ -219,22 +219,32 @@ def run_argoverse2bag():
         for i in range(7)
     ]
     lidar_extrinsics = np.eye(4)
-
-    # tf_static
-    transforms = [
-        ("base_link", lidar_frame_id, lidar_extrinsics),
-        ("base_link", cameras[0][1], av2_cams[0].extrinsics),
-        ("base_link", cameras[1][1], av2_cams[1].extrinsics),
-        ("base_link", cameras[2][1], av2_cams[2].extrinsics),
-        ("base_link", cameras[3][1], av2_cams[3].extrinsics),
-        ("base_link", cameras[4][1], av2_cams[4].extrinsics),
-        ("base_link", cameras[5][1], av2_cams[5].extrinsics),
-        ("base_link", cameras[6][1], av2_cams[6].extrinsics),
-    ]
+    # r = R.from_euler('y', 90, degrees=True)
+    # lidar_extrinsics[:3, :3] = r.as_matrix()
 
     try:
         # Export
         lidar_fpaths = av2_dataloader.get_ordered_log_lidar_fpaths(args.log_id)
+
+        # tf_static
+        transforms = [
+            (
+                "base_link",
+                lidar_frame_id,
+                    Sweep.from_feather(
+                        lidar_fpaths[0]
+                    ).ego_SE3_up_lidar.transform_matrix
+                ,
+            ),
+            ("base_link", cameras[0][1], inv(av2_cams[0].extrinsics)),
+            ("base_link", cameras[1][1], inv(av2_cams[1].extrinsics)),
+            ("base_link", cameras[2][1], inv(av2_cams[2].extrinsics)),
+            ("base_link", cameras[3][1], inv(av2_cams[3].extrinsics)),
+            ("base_link", cameras[4][1], inv(av2_cams[4].extrinsics)),
+            ("base_link", cameras[5][1], inv(av2_cams[5].extrinsics)),
+            ("base_link", cameras[6][1], inv(av2_cams[6].extrinsics)),
+        ]
+
         save_static_transforms(bag, transforms, lidar_fpaths)
         save_dynamic_tf(bag, av2_dataloader, lidar_fpaths, log_id=args.log_id)
         for camera in cameras:
