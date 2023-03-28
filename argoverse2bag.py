@@ -29,11 +29,10 @@ def save_dynamic_tf(bag, av2_dataloader, lidar_fpaths, log_id):
         timestamp_ns = float(lidar_fpath.stem)
         dt = datetime.fromtimestamp(timestamp_ns / 1000000000)
         timestamp = rospy.Time.from_sec(float(dt.strftime("%s.%f")))
-        map2lidar = (
+        map2ego = (
             av2_dataloader.get_city_SE3_ego(
                 log_id=log_id, timestamp_ns=int(lidar_fpath.stem)
             )
-            .inverse()
             .transform_matrix
         )
         tf_msg = TFMessage()
@@ -42,8 +41,8 @@ def save_dynamic_tf(bag, av2_dataloader, lidar_fpaths, log_id):
         tf_stamped.header.frame_id = "map"
         tf_stamped.child_frame_id = "base_link"
 
-        t = map2lidar[0:3, 3]
-        q = R.from_matrix(map2lidar[:3, :3]).as_quat()
+        t = map2ego[0:3, 3]
+        q = R.from_matrix(map2ego[:3, :3]).as_quat()
         transform = Transform()
 
         transform.translation.x = t[0]
